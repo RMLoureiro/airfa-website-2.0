@@ -10,8 +10,9 @@ The repository contains only documentation and design assets. No code has been w
 
 Done so far:
 - Design mockups + logo saved to `agent/design/`.
-- Full documentation set written (requirements, architecture, design spec, content inventory, roadmap, README).
+- Full documentation set written (requirements, architecture, design spec, content inventory, roadmap, README, CLAUDE.md).
 - Stack decided with the owner: **Go API + Next.js frontend + Postgres** (see Decisions).
+- Tooling: project-scope plugins enabled in `.claude/settings.json` — frontend-design, playwright, chrome-devtools-mcp (prisma explicitly disabled). Usage rules in START-HERE.md → Tooling & skills.
 
 ## Next steps
 
@@ -40,4 +41,5 @@ None.
 
 ## Session log
 
+- **2026-07-12 (b)** — Detail pass: added API conventions, env vars, and canonical block-tree JSON to architecture.md; layout metrics to design-spec.md; living-document rules to all agent docs; CLAUDE.md created; project plugins enabled (frontend-design, playwright, chrome-devtools-mcp).
 - **2026-07-12** — Project restarted from scratch. Wrote documentation set, saved design assets, initialized planning. No code yet.

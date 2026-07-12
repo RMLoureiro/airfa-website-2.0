@@ -1,6 +1,6 @@
 # Roadmap
 
-Tick items as they complete; keep in sync with STATUS.md. Phases ship in order; each ends with something the owner can see/verify.
+> **Living document.** Tick items **in the same session** they complete; keep in sync with STATUS.md. If scope is added/dropped, edit the items here and record why in STATUS.md → Decisions. Phases ship in order; each ends with something the owner can see/verify.
 
 ## Phase 0 — Foundations *(not started)*
 

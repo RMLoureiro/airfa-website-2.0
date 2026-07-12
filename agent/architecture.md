@@ -1,5 +1,7 @@
 # Architecture
 
+> **Living document.** If implementation deviates from anything here, update this file in the same session and log the reason in `STATUS.md → Decisions`. Sections marked *(Phase 0/1/2/3)* are commitments, not history — they describe what to build.
+
 ## 1. Overview
 
 Two applications + one database, deployed as Docker containers behind Dokploy's reverse proxy:
@@ -45,6 +47,28 @@ Two applications + one database, deployed as Docker containers behind Dokploy's 
   - Admin (session + role): CRUD on pages/blocks (draft state), menus, media, collections, settings, users (Admin only), versions (`GET /v1/pages/:id/versions`, `POST /v1/versions/:id/restore`)
   - `POST /v1/pages/:id/publish` — promotes draft → published, writes a version snapshot, and triggers frontend revalidation (calls a Next.js revalidate webhook with a shared secret)
 
+### 2.1 API conventions
+
+- Base path `/v1`; JSON everywhere; `snake_case` field names in the API (frontend maps to camelCase at its boundary).
+- Errors: consistent envelope `{ "error": { "code": "string", "message": "human readable (pt for CMS-facing messages)", "fields": { "field": "problem" } } }` with proper status codes (400 validation, 401 unauthenticated, 403 forbidden, 404, 409 conflict e.g. duplicate slug, 422 semantic).
+- Lists: `?limit=&offset=` + `X-Total-Count` header (collections are small; no cursor pagination needed).
+- Auth: session cookie (`airfa_session`, httpOnly, Secure, SameSite=Lax). CSRF: state-changing admin routes require `X-Requested-With` or a double-submit token — decide in Phase 2 and record here.
+- All admin mutations are logged (who, what, when) — a simple `audit_log` table; cheap and invaluable for a multi-editor CMS.
+- Media uploads: `multipart/form-data`, size limits (images ≤ 10 MB, PDFs ≤ 25 MB), MIME sniffed server-side, never trust the extension.
+
+### 2.2 Environment variables
+
+| Var | Service | Purpose |
+|---|---|---|
+| `DATABASE_URL` | api | Postgres DSN |
+| `MEDIA_DIR` | api | Filesystem root for uploads (default `/data/media`) |
+| `SESSION_TTL` | api | Session lifetime (default 720h) |
+| `REVALIDATE_URL` / `REVALIDATE_SECRET` | api | Next.js on-publish webhook |
+| `PORT` | both | Listen port |
+| `API_URL` | web | Internal URL of the Go API (server-side fetches + `/api` rewrite target) |
+
+Keep `.env.example` files in `api/` and `web/` current whenever a variable is added.
+
 ## 3. Content model
 
 The heart of the system: pages are **trees of typed blocks**, stored as JSONB but validated by Go structs per block type (the same catalog the frontend renders — `design-spec.md` §Blocks).
@@ -71,6 +95,44 @@ Notes:
 - Blocks carry stable `id`s (uuid) inside the JSON so the builder can reorder/patch without diffs.
 - Internal links inside block fields are stored as `{ "type": "page", "pageId": ... }` and resolved to slugs at render time — renaming a slug never breaks links.
 - A future `locale` column on `page_revisions`/collections is the multi-language path; don't build it now, don't block it.
+
+### 3.1 Block tree shape (canonical example)
+
+The `blocks` JSONB on a revision is an ordered array; every block has `id`, `type`, `data`. Nested item lists live inside `data`. Example (trimmed homepage):
+
+```json
+[
+  {
+    "id": "b1f4…",
+    "type": "hero-slider",
+    "data": {
+      "slides": [
+        {
+          "id": "s1…",
+          "image": { "mediaId": "m42…", "alt": "Palco do Cine-Teatro" },
+          "headline": "Um espetáculo mais do que inesquecível",
+          "underlinedWord": "inesquecível",
+          "ctas": [
+            { "label": "SABER MAIS", "variant": "outline", "link": { "type": "page", "pageId": "p7…" } },
+            { "label": "SABER MAIS", "variant": "solid",   "link": { "type": "url", "url": "https://…" } }
+          ]
+        }
+      ],
+      "newsItems": [
+        { "id": "n1…", "title": "O Xeque-Mate da Cultura Pop", "excerpt": "Como uma jogada antiga…", "link": { "type": "page", "pageId": "p9…" } }
+      ]
+    }
+  },
+  { "id": "b2…", "type": "section-band", "data": { "text": "PRÓXIMOS EVENTOS EM CARTAZ", "color": "red", "align": "center" } },
+  { "id": "b3…", "type": "events-fan-carousel", "data": { "source": "auto", "limit": 8 } }
+]
+```
+
+Rules:
+- `id`s are UUIDs generated at creation and **never change** (drag-reorder moves objects, doesn't recreate them) — this keeps version diffs and the builder stable.
+- Media is always referenced as `{ "mediaId", "alt" }` — never raw URLs — so replacing a file in the library updates every usage.
+- Links are always the `{ "type": "page" | "url", … }` union described above.
+- Each block type has a Go struct (validation) and a TS type + React component (rendering). The three MUST stay in sync — a shared JSON fixture per block type under `web/src/blocks/__fixtures__/` is rendered in component tests to catch drift.
 
 ## 4. Frontend (Next.js)
 

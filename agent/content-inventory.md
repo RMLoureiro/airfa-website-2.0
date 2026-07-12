@@ -1,5 +1,7 @@
 # Content Inventory — what must exist at launch
 
+> **Living document.** During Phase 1 seeding: tick pages as migrated, verify each "fixed fact" against the live site, and note anything skipped/deferred. This file is the launch checklist for content completeness.
+
 Source of truth for current content: the live site **https://www.airfa.pt** and its codebase at **`../airfa-website/`** (static HTML + assets; content is partly rendered by its own mini-CMS, so extract text from the live pages or the HTML files there). Use it for **content only** — not design, not architecture.
 
 ## Site map of the current site (to be reproduced, reorganized per new design)

@@ -36,6 +36,10 @@ agent/          Project documentation for humans and AI agents
   design/         Mockups + logo (source of truth for the visual design)
 ```
 
+## Tooling
+
+Project-scope Claude Code plugins are enabled in `.claude/settings.json`: **frontend-design** (UI implementation quality), **playwright** (visual verification + e2e), **chrome-devtools-mcp** (runtime debugging). `CLAUDE.md` routes agents to the onboarding doc. Expected practices (verify before commit, code review per feature) are defined in `agent/START-HERE.md`.
+
 ## Getting started (once code exists)
 
 Phase 0 of the roadmap creates the scaffolding; until then there is nothing to run. The dev environment assumes a local Postgres (see `agent/architecture.md` → Development environment).

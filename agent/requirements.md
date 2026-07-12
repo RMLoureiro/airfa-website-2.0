@@ -1,5 +1,7 @@
 # Requirements
 
+> **Living document.** When the owner answers an open question (see `STATUS.md`), replace the *(proposal — confirm)* marker with the confirmed decision and date. When scope changes, edit the requirement — don't let this file drift from reality.
+
 ## 1. Goal
 
 Rebuild www.airfa.pt with the new design (mockups in `design/`) and give AIRFA a WordPress-like editing experience: a non-technical person logs in and can change essentially everything on the site — text, images, blocks, whole pages, menus — without a developer.

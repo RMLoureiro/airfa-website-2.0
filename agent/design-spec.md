@@ -2,6 +2,8 @@
 
 **Source of truth:** the mockups in `design/`. This document describes them so agents can plan and name things, but when in doubt, open the images. Follow the design **strictly**.
 
+> **Living document.** When you sample exact colors/measure spacing from the mockups, replace the ≈ values here with finals. When you add a block type, extend §6. When the owner answers a design question, remove the TBD and record the answer. Use the **frontend-design** skill when implementing any of this.
+
 - `design/mockup-01-homepage.jpeg` — Homepage
 - `design/mockup-02-banda.png` — Banda (content/story page pattern)
 - `design/mockup-03-estatutos.png` — Estatutos (documents page pattern)
@@ -24,6 +26,13 @@
 - Body: same sans, 400/500, comfortable line-height.
 
 **Shape language:** generous rounded corners on cards/images (~16–24px); pill-shaped buttons and tags; full-bleed colored bands for section separators.
+
+**Layout metrics** (desktop reference, from mockups — verify by measuring the images):
+- Content container: ~1200–1280px max width, generous side padding; several elements bleed full-width (bands, hero, footer, sliders).
+- Section titles sit ~48–64px above their content; sections separated by ~80–120px of whitespace on light backgrounds.
+- Utility bar ≈ 32px tall; main header ≈ 72px; red secondary bar ≈ 48px. Header group is sticky on scroll (proposal — confirm behavior with owner; mockups are static).
+- Buttons: pill radius (999px), uppercase labels, comfortable horizontal padding (~24–28px).
+- Card grids: 3 columns for blog cards, ~24–32px gutters.
 
 ## 2. Global chrome (all pages)
 
