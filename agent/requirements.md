@@ -20,7 +20,9 @@ At launch the site must contain **all the information of the current airfa.pt** 
 
 ## 3. CMS — "Área Reservada"
 
-Login-protected admin at `/area-reservada`. Everything below happens through the UI, no code:
+Login-protected admin at `/area-reservada`. Everything below happens through the UI, no code.
+
+*There are no mockups for the admin* — the strict-design rule applies to the public site only. The admin should be a clean, functional UI (shadcn/ui components, AIRFA red as accent), all labels in Portuguese, optimized for a non-technical editor: obvious buttons, confirmations before destructive actions, and no unexplained jargon.
 
 ### 3.1 Page management
 - Create, rename, delete, and reorder pages; each page has a slug, SEO fields, and a block list.

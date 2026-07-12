@@ -24,6 +24,7 @@
 - Headings/UI: a tight bold sans (proposal: **Archivo** or **Inter**, weights 600–900). Section titles are UPPERCASE, very bold, large (e.g. "ATIVIDADES 2025/26", "BLOG", "PARCEIROS E APOIOS" — left-aligned; "PRÓXIMOS EVENTOS EM CARTAZ", "GALERIA" — centered white on colored band).
 - Display numerals/hero display: the giant "1895" on mockup-02 and huge "BANDA" title — serif display for numerals (proposal: **Playfair Display** or similar Didone) and ultra-bold sans for page titles.
 - Body: same sans, 400/500, comfortable line-height.
+- **Delivery:** self-host all fonts via `next/font` (no Google Fonts CDN / external font requests — keeps GDPR surface at zero and avoids layout shift).
 
 **Shape language:** generous rounded corners on cards/images (~16–24px); pill-shaped buttons and tags; full-bleed colored bands for section separators.
 

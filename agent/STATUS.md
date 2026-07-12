@@ -23,8 +23,8 @@ Done so far:
 ## Open questions for the owner
 
 - [ ] **Hosting**: assumed Docker via Dokploy on your VPS. Confirm.
-- [ ] **CMS roles**: proposed Admin + Editor (requirements.md §5). Confirm or simplify to a single admin role for v1.
-- [ ] **Versioning depth**: proposed simple published/draft + version history with restore (requirements.md §6). Confirm.
+- [ ] **CMS roles**: proposed Admin + Editor (requirements.md §4). Confirm or simplify to a single admin role for v1.
+- [ ] **Versioning depth**: proposed simple published/draft + version history with restore (requirements.md §5). Confirm.
 - [ ] **Blog & events**: the homepage mockup shows a Blog section and event "cartazes". Are these real content types the association will feed, or placeholders? (Affects Phase 1 scope.)
 - [ ] **Donations (DOAR button)**: where should it link? External platform, IBAN info page, or something else?
 - [ ] **Exact fonts**: design-spec.md proposes families matching the mockups; confirm or provide the original design's font names if known.
@@ -41,5 +41,6 @@ None.
 
 ## Session log
 
+- **2026-07-12 (c)** — Consistency pass: fixed requirements.md § references in Open questions; specified homepage slug convention (`inicio` → `/`), image variant sizes (320/960/1920), font self-hosting via next/font, admin-UI-has-no-mockups rule; verified toolchain (Go 1.26.4, Node 26.4).
 - **2026-07-12 (b)** — Detail pass: added API conventions, env vars, and canonical block-tree JSON to architecture.md; layout metrics to design-spec.md; living-document rules to all agent docs; CLAUDE.md created; project plugins enabled (frontend-design, playwright, chrome-devtools-mcp).
 - **2026-07-12** — Project restarted from scratch. Wrote documentation set, saved design assets, initialized planning. No code yet.

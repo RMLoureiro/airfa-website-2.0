@@ -94,6 +94,8 @@ Notes:
 - **Draft/published** = two revision pointers per page; publishing copies draft → published and appends a `snapshot` revision (history). Restore = copy snapshot → new draft.
 - Blocks carry stable `id`s (uuid) inside the JSON so the builder can reorder/patch without diffs.
 - Internal links inside block fields are stored as `{ "type": "page", "pageId": ... }` and resolved to slugs at render time — renaming a slug never breaks links.
+- **Homepage routing:** the page with reserved slug `inicio` renders at `/` (redirect `/inicio` → `/`). The slug is reserved: it cannot be deleted or renamed from the CMS, only edited.
+- **Image variants** generated on upload: `thumb` 320px, `medium` 960px, `large` 1920px (longest edge, WebP + original format). The API returns all variant URLs with the media object; the frontend picks per context.
 - A future `locale` column on `page_revisions`/collections is the multi-language path; don't build it now, don't block it.
 
 ### 3.1 Block tree shape (canonical example)
@@ -143,6 +145,7 @@ Rules:
 
 ## 5. Development environment
 
+- Toolchain verified on this machine (2026-07-12): Go 1.26.x, Node 26.x — Phase 0 needs no installs beyond project deps.
 - This machine has Postgres running locally on :5432 (a previous `airfa_dev` DB / `airfa` role may exist from the discarded attempt — **drop and recreate cleanly in Phase 0**).
 - `docker-compose.dev.yml` optional; native Postgres is fine for dev.
 - Makefile targets (Phase 0): `make dev` (api + web concurrently), `make migrate`, `make seed`, `make sqlc`, `make test`.
