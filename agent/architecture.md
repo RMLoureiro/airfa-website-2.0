@@ -19,11 +19,33 @@ Two applications + one database, deployed as Docker containers behind Dokploy's 
 - **PostgreSQL** — content, users, sessions, versions.
 - **Media volume** — uploaded files on disk (`/data/media`), served by the Go API (`/media/...`) with cache headers. Simple, backup-friendly; can move to S3-compatible storage later without schema changes (paths are opaque URLs to the frontend).
 
+## 1.1 Repository layout (monorepo)
+
+Single Git repo, polyglot (Go + TypeScript), organized with the `apps/` + `packages/` convention. **The root `Makefile` is the one task runner across both languages** (npm workspaces / Turborepo are JS-only, so Make stays the top-level entrypoint).
+
+```
+airfa-website-2.0/
+  apps/
+    api/                 Go service (module github.com/RMLoureiro/airfa-website-2.0/apps/api)
+    web/                 Next.js app (npm workspace)
+  packages/
+    shared/              shared TS: API DTO types, block TS types + JSON fixtures (block-tree sync, §3.1)
+  agent/                 project docs (specs, design, roadmap)
+  go.work                Go workspace (points at apps/api; ready for more Go modules)
+  package.json           root — npm workspaces: ["apps/web", "packages/*"]
+  Makefile               unified runner: dev / migrate / sqlc / seed / test
+  .editorconfig .gitignore
+```
+
+- **JS side:** npm workspaces at the root; `apps/web` and everything under `packages/*` are workspaces, so shared TS (e.g. block types + fixtures) is imported by path, versioned once. Turborepo can be layered on later for JS build caching — not needed while there's a single JS build target.
+- **Go side:** one module at `apps/api` under a root `go.work`. The workspace file makes adding a second Go module (e.g. a CLI or worker) a one-line change without import-path churn.
+- **Shared block catalog** (§3.1) lives in `packages/shared` so the TS block types and JSON fixtures have a single home the web app consumes; the Go structs mirror them and the fixtures test both sides for drift.
+
 ## 2. Backend (Go)
 
-- **Go** latest stable; standard project layout:
+- **Go** latest stable; standard project layout (under `apps/api/`):
   ```
-  api/
+  apps/api/
     cmd/server/main.go
     internal/
       http/        handlers, middleware, router (chi)
@@ -32,7 +54,9 @@ Two applications + one database, deployed as Docker containers behind Dokploy's 
       media/       upload, image variants, static serving
       db/          sqlc-generated code, pgx pool
     migrations/    golang-migrate SQL files
+    queries/       sqlc source queries
     sqlc.yaml
+    go.mod
   ```
 - **Libraries** (deliberately boring):
   - Router: `go-chi/chi` (stdlib-compatible, middleware ecosystem)
@@ -134,12 +158,12 @@ Rules:
 - `id`s are UUIDs generated at creation and **never change** (drag-reorder moves objects, doesn't recreate them) — this keeps version diffs and the builder stable.
 - Media is always referenced as `{ "mediaId", "alt" }` — never raw URLs — so replacing a file in the library updates every usage.
 - Links are always the `{ "type": "page" | "url", … }` union described above.
-- Each block type has a Go struct (validation) and a TS type + React component (rendering). The three MUST stay in sync — a shared JSON fixture per block type under `web/src/blocks/__fixtures__/` is rendered in component tests to catch drift.
+- Each block type has a Go struct (validation) and a TS type + React component (rendering). The three MUST stay in sync — a shared JSON fixture per block type under `packages/shared` (block types + fixtures) is rendered in `apps/web` component tests to catch drift.
 
 ## 4. Frontend (Next.js)
 
-- Next.js latest stable, **App Router**, TypeScript, **Tailwind CSS** (+ shadcn/ui for admin forms/dialogs; public site is fully custom per the mockups).
-- **Public site**: dynamic routes `app/[[...slug]]/page.tsx` fetch the published page from the API and render via a **block registry** — `Record<BlockType, React.Component>` mapping 1:1 to the catalog in design-spec.md. On-demand revalidation (tag-based) triggered by the API's publish webhook; falls back to a short TTL.
+- Next.js latest stable, **App Router**, TypeScript, **Tailwind CSS** (+ shadcn/ui for admin forms/dialogs; public site is fully custom per the mockups). Lives at `apps/web`.
+- **Public site**: dynamic routes `apps/web/src/app/[[...slug]]/page.tsx` fetch the published page from the API and render via a **block registry** — `Record<BlockType, React.Component>` mapping 1:1 to the catalog in design-spec.md. On-demand revalidation (tag-based) triggered by the API's publish webhook; falls back to a short TTL.
 - **Admin (`/area-reservada`)**: client-heavy React (forms, drag-and-drop via `dnd-kit`, block editor panels). Talks to the Go API via the `/api` rewrite; session cookie is first-party. A middleware guard redirects unauthenticated users to login.
 - **Preview**: draft mode route that fetches the draft revision with the editor's session — same block registry renders it.
 

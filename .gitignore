@@ -1,6 +1,27 @@
+# dependencies (npm workspaces hoist node_modules to the repo root)
 node_modules/
+
+# next.js build output
+.next/
+/apps/web/out/
+
+# go build artifacts
+/apps/api/server
+/apps/api/bin/
+dist/
+
+# local uploaded media (MEDIA_DIR default ./.data/media)
+.data/
+
+# env files — keep *.env.example tracked
 .env
 .env.local
+.env.*.local
+*.env.local
+
+# logs
 *.log
-dist/
-.next/
+npm-debug.log*
+
+# os / editor cruft
+.DS_Store

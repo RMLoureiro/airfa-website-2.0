@@ -42,12 +42,12 @@ Login-protected admin at `/area-reservada`. Everything below happens through the
 
 ### 3.4 Content collections (structured content beyond pages)
 - **Events / Cartazes** — poster image, title, date(s), optional description + link. Feed the homepage "Próximos eventos em cartaz" carousel and an events page.
-- **Blog posts** — title, cover, excerpt, body (blocks), publish date. Feed the homepage Blog grid. *(Scope to confirm — see STATUS.md open questions.)*
+- **Blog posts** — title, cover, excerpt, body (blocks), publish date. Feed the homepage Blog grid. *(Confirmed real content, 2026-07-12 — the association will maintain posts; build + seed fully in Phase 1.)*
 - **Partners** — logo + name + optional URL. Feed the "Parceiros e Apoios" strip shown on every page.
 - **Activities** — name, category, image, schedule/instructor info. Feed the activities slider and pages.
 
 ### 3.5 Site settings
-- Contact info (address, email, phone, NIB), social links, DOAR button target, footer texts, logo/favicon.
+- Contact info (address, email, phone, NIB), social links, DOAR button target (v1: an on-site how-to-donate / IBAN page — internal page link, not an external platform), footer texts, logo/favicon.
 
 ## 4. Users & roles *(proposal — confirm)*
 

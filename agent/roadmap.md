@@ -2,18 +2,18 @@
 
 > **Living document.** Tick items **in the same session** they complete; keep in sync with STATUS.md. If scope is added/dropped, edit the items here and record why in STATUS.md → Decisions. Phases ship in order; each ends with something the owner can see/verify.
 
-## Phase 0 — Foundations *(not started)*
+## Phase 0 — Foundations *(scaffolding done 2026-07-13; 3 items deferred to Phase 1 · Stage A)*
 
-Goal: empty but running skeleton; `make dev` brings everything up.
+Goal: empty but running skeleton; `make dev` brings everything up. Monorepo layout `apps/` + `packages/` (architecture.md §1.1). Detailed state + remaining steps in `current_phase.md` (repo root).
 
-- [ ] Repo scaffolding: `api/` (Go module, chi server, healthcheck route), `web/` (create-next-app, TS, Tailwind), root `Makefile`, `.editorconfig`, `.gitignore`
-- [ ] Postgres dev database created fresh (`airfa_dev`); `.env.example` for both apps
-- [ ] Migrations tooling wired (golang-migrate) + first migration (users, sessions)
-- [ ] sqlc configured and generating
-- [ ] `web` → `api` proxy rewrite working (`/api/*`); web renders a page with data fetched from api
-- [ ] Basic CI-able checks: `go vet`/`go test`, `tsc --noEmit`, `next build`
+- [x] Repo scaffolding: `apps/api` (Go module, chi server, healthcheck route), `apps/web` (create-next-app, TS, Tailwind), root `Makefile`, `.editorconfig`, `.gitignore` — plus `packages/shared`, root npm workspace, `go.work`
+- [x] Postgres dev database created fresh (`airfa_dev`); `.env.example` for both apps
+- [x] Migrations tooling wired (golang-migrate) — *first migration (users, sessions) deferred to Stage A.1*
+- [x] sqlc configured (`apps/api/sqlc.yaml`) — *generating deferred to Stage A.2 (needs first queries)*
+- [x] `web` → `api` proxy rewrite working (`/api/*`) — *round-trip page (web renders API data) deferred to Stage A.3*
+- [x] Basic CI-able checks: `go vet`/`go test`, `tsc --noEmit`, `next build` — all green
 
-**Demo:** `make dev` → localhost shows a placeholder page that round-trips through the Go API.
+**Demo:** `make dev` → localhost shows a placeholder page that round-trips through the Go API. *(Lands when Stage A endpoints render — the scaffolding + `make dev` + `/healthz` work today.)*
 
 ## Phase 1 — Content model + public site in the new design
 

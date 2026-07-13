@@ -27,7 +27,7 @@ Source of truth for current content: the live site **https://www.airfa.pt** and 
 ## Navigation in the new design (from mockups)
 
 - **Utility top bar**: Blog · Ajuda & Suporte · Imprensa · Login
-- **Main nav**: Quem Somos ▾ · Actividades ▾ (labelled "O que fazemos" on one mockup — confirm final label) · Banda ▾ · Salas de Espetáculo ▾ · Contactos ▾ · search icon
+- **Main nav**: Quem Somos ▾ · Actividades ▾ (final label confirmed 2026-07-12 — "Actividades") · Banda ▾ · Salas de Espetáculo ▾ · Contactos ▾ · search icon
 - **Secondary red bar**: Missão/Atividades · Cartazes de Eventos · A nossa História · Junte-se a nós · **DOAR** (pill button)
 - **Footer columns**: Explorar (Home, Sobre nós, Menu, Contactos) · Serviços (Encomendas, Reservas, Personalização) · Social (Instagram, Facebook, Twitter/X, LinkedIn) — footer content in mockups looks partly placeholder; owner to confirm real links.
 

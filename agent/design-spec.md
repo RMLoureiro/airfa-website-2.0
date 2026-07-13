@@ -20,11 +20,11 @@
 - `footer-blue` — pale desaturated blue-grey footer background, ≈ `#C9D4DF` (with a large watermark of the crest, low-opacity, bottom-left)
 - `grey-placeholder` — light grey used in card/image placeholders, ≈ `#D8DCE0`
 
-**Typography** (mockups appear to use a bold grotesque for headings; confirm exact family with owner):
-- Headings/UI: a tight bold sans (proposal: **Archivo** or **Inter**, weights 600–900). Section titles are UPPERCASE, very bold, large (e.g. "ATIVIDADES 2025/26", "BLOG", "PARCEIROS E APOIOS" — left-aligned; "PRÓXIMOS EVENTOS EM CARTAZ", "GALERIA" — centered white on colored band).
-- Display numerals/hero display: the giant "1895" on mockup-02 and huge "BANDA" title — serif display for numerals (proposal: **Playfair Display** or similar Didone) and ultra-bold sans for page titles.
-- Body: same sans, 400/500, comfortable line-height.
-- **Delivery:** self-host all fonts via `next/font` (no Google Fonts CDN / external font requests — keeps GDPR surface at zero and avoids layout shift).
+**Typography** — **confirmed 2026-07-12: Inter for all text** (headings, UI, body, and display numerals). Single family, weight range does the work.
+- Headings/UI: **Inter**, weights 600–900. Section titles are UPPERCASE, very bold, large (e.g. "ATIVIDADES 2025/26", "BLOG", "PARCEIROS E APOIOS" — left-aligned; "PRÓXIMOS EVENTOS EM CARTAZ", "GALERIA" — centered white on colored band).
+- Display numerals/hero display: the giant "1895" on mockup-02 and huge "BANDA" title — **Inter** at its heaviest weight (800–900). *Verify against mockup-02 while implementing Stage B:* if the numeral is unmistakably a serif/Didone in the mockup, flag it to the owner before deviating (owner named Inter as the design font).
+- Body: **Inter** 400/500, comfortable line-height.
+- **Delivery:** self-host via `next/font/google` (Inter). This downloads and serves the font from our own origin at build time — no runtime Google Fonts CDN / external requests — keeping GDPR surface at zero and avoiding layout shift.
 
 **Shape language:** generous rounded corners on cards/images (~16–24px); pill-shaped buttons and tags; full-bleed colored bands for section separators.
 
@@ -42,7 +42,7 @@ Very slim, light grey. Right-aligned small uppercase links: `BLOG · AJUDA & SUP
 
 ### 2.2 Main header (white)
 - Left: crest logo + wordmark "AIRFA" with tiny "Desde 1895" underneath.
-- Center/right: uppercase menu items with dropdown carets: `QUEM SOMOS ▾ · ACTIVIDADES ▾ (a.k.a. "O QUE FAZEMOS" on one mockup — final label TBD) · BANDA ▾ · SALAS DE ESPETÁCULO ▾ · CONTACTOS ▾` + search icon (opens search overlay; search can be Phase 2+).
+- Center/right: uppercase menu items with dropdown carets: `QUEM SOMOS ▾ · ACTIVIDADES ▾ (final label confirmed 2026-07-12 — "Actividades", not "O que fazemos") · BANDA ▾ · SALAS DE ESPETÁCULO ▾ · CONTACTOS ▾` + search icon (opens search overlay; search can be Phase 2+).
 - Dropdowns host sub-pages (e.g. Quem Somos → História, Estatutos, Órgãos Sociais, Hino, Biblioteca, Documentos).
 
 ### 2.3 Secondary red bar

@@ -1,0 +1,8 @@
+{
+  "name": "airfa-website-2.0",
+  "private": true,
+  "workspaces": ["apps/web", "packages/*"],
+  "overrides": {
+    "postcss": "^8.5.10"
+  }
+}
