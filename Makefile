@@ -1,4 +1,5 @@
 DATABASE_URL ?= postgres://airfa:airfa@localhost:5432/airfa_dev?sslmode=disable
+export DATABASE_URL
 
 .PHONY: dev migrate migrate-down migrate-create sqlc seed test
 

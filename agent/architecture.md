@@ -74,7 +74,8 @@ airfa-website-2.0/
 ### 2.1 API conventions
 
 - Base path `/v1`; JSON everywhere; `snake_case` field names in the API (frontend maps to camelCase at its boundary).
-- Errors: consistent envelope `{ "error": { "code": "string", "message": "human readable (pt for CMS-facing messages)", "fields": { "field": "problem" } } }` with proper status codes (400 validation, 401 unauthenticated, 403 forbidden, 404, 409 conflict e.g. duplicate slug, 422 semantic).
+- Errors: consistent envelope `{ "error": { "code": "string", "message": "human readable (English)", "fields": { "field": "problem" } } }` with proper status codes (400 validation, 401 unauthenticated, 403 forbidden, 404, 409 conflict e.g. duplicate slug, 422 semantic).
+- **API error `message` is English, always** (decided 2026-07-17). API errors are never shown to users raw — the frontend keys off the stable `code` and renders its own pt-PT copy. `message` and `fields` are for developers and logs. Anything user-facing gets translated at the frontend boundary, which is also where the CMS admin UI's Portuguese strings live. Corollary: **`code` is the contract** — it must be stable and machine-readable; never make the frontend match on `message` text.
 - Lists: `?limit=&offset=` + `X-Total-Count` header (collections are small; no cursor pagination needed).
 - Auth: session cookie (`airfa_session`, httpOnly, Secure, SameSite=Lax). CSRF: state-changing admin routes require `X-Requested-With` or a double-submit token — decide in Phase 2 and record here.
 - All admin mutations are logged (who, what, when) — a simple `audit_log` table; cheap and invaluable for a multi-editor CMS.

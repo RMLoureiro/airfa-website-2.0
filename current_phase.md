@@ -450,9 +450,9 @@ psql "postgres://airfa:airfa@localhost:5432/airfa_dev?sslmode=disable" -c "\dt"
 make migrate-down    # (drops last migration; run 3x to fully unwind if you want)
 make migrate
 ```
-- [ ] three migration pairs created and filled
-- [ ] `make migrate` applies cleanly; `\dt` shows all 11 tables
-- [ ] `make migrate-down` works (down files valid), then re-applied
+- [x] three migration pairs created and filled
+- [x] `make migrate` applies cleanly; `\dt` shows all 11 tables
+- [x] `make migrate-down` works (down files valid), then re-applied
 
 ---
 
@@ -477,7 +477,10 @@ join page_revisions r on r.page_id = p.id and r.kind = 'published'
 where p.slug = $1 and p.deleted_at is null;
 ```
 
-**`apps/api/queries/collections.sql`** (events shown; posts/partners/activities follow the same shape)
+**`apps/api/queries/collections.sql`** — ✅ complete as of 2026-07-16 (all four collections; verified against the generated code).
+
+> **Rule: a list query never `select`s a jsonb column.** The handlers serialize sqlc's row structs straight to JSON, and jsonb arrives in Go as `[]byte`, which `encoding/json` renders as **base64 garbage** rather than JSON. So `events` omits `body` and `activities` omits `info` — lists are flat summaries. Full bodies come from per-item detail endpoints later (Phase 2), which map jsonb through `json.RawMessage`.
+
 ```sql
 -- name: ListPublishedEvents :many
 select id, title, poster_media_id, starts_at, ends_at, sort
@@ -488,29 +491,58 @@ limit $1 offset $2;
 
 -- name: CountPublishedEvents :one
 select count(*) from events where status = 'published';
+
+-- name: ListPublishedPosts :many
+select id, title, slug, cover_media_id, excerpt, published_at
+from posts
+where status = 'published'
+order by published_at desc nulls last, created_at desc
+limit $1 offset $2;
+
+-- name: CountPublishedPosts :one
+select count(*) from posts where status = 'published';
+
+-- name: ListPartners :many
+select id, name, logo_media_id, url, sort
+from partners
+order by sort asc, name asc
+limit $1 offset $2;
+
+-- name: CountPartners :one
+select count(*) from partners;
+
+-- name: ListPublishedActivities :many
+select id, name, category, image_media_id, sort
+from activities
+where status = 'published'
+order by sort asc, name asc
+limit $1 offset $2;
+
+-- name: CountPublishedActivities :one
+select count(*) from activities where status = 'published';
 ```
+
+> `partners` has no `status` column (see the A.1 schema) — every partner row is public, so there's no published filter and `CountPartners` counts all rows.
 
 **Generate + verify:**
 ```bash
 make sqlc
 go build ./apps/api/...
 ```
-- [ ] query files written (`site.sql`, `pages.sql`, `collections.sql` with all four collections)
-- [ ] `make sqlc` generates `apps/api/internal/db/*` with no errors
-- [ ] `go build ./apps/api/...` compiles
+- [x] `site.sql`, `pages.sql`, `collections.sql` written — all four collections
+- [x] `make sqlc` generates `apps/api/internal/db/*` with no errors — 11 query funcs across `site/pages/collections.sql.go`
+- [x] `go build ./apps/api/...` compiles
+
+> **Generated types A.3 depends on** (verified 2026-07-16 — check here before writing handler code):
+> `ListPublishedEventsRow`, `ListPublishedPostsRow`, `ListPublishedActivitiesRow`, and their `…Params` twins, plus `ListPartnersParams`.
+> **There is no `ListPartnersRow`** — `ListPartners` selects every column of `partners`, so sqlc reuses the `db.Partner` model. Nullable `partners.url` is `*string` (`emit_pointers_for_null_types`); nullable UUID/timestamp columns stay `pgtype.UUID` / `pgtype.Timestamptz`. All marshal to correct JSON.
 
 ---
 
 ### A.3 — Public read endpoints
 **Goal:** wire the DB pool and expose the three public surfaces (`agent/architecture.md §2.1`).
 
-**Wiring (spec):**
-- `apps/api/internal/db` — a `func NewPool(ctx, dsn) (*pgxpool.Pool, error)` opening the pool from `DATABASE_URL`; sqlc's generated `db.New(pool)` gives a `*db.Queries`.
-- `apps/api/internal/http` — handlers holding a `*db.Queries`; a `Router(q *db.Queries) http.Handler` that mounts `/healthz` + the `/v1/*` routes below.
-- `apps/api/cmd/server/main.go` — read env (`DATABASE_URL`, `PORT`), open the pool, build queries, mount the router, listen.
-- Errors use the envelope from architecture.md §2.1: `{"error":{"code","message","fields"}}`.
-
-**Endpoints:**
+**Endpoints being built:**
 
 | Method | Path | Returns |
 |---|---|---|
@@ -518,7 +550,475 @@ go build ./apps/api/...
 | `GET` | `/v1/pages/{slug}` | `{ "slug","title","seo":{…},"blocks":[…] }` — `404` envelope if not found/published |
 | `GET` | `/v1/collections/{name}` | JSON array of published items; `name ∈ {events,posts,partners,activities}`; `?limit=&offset=`; sets `X-Total-Count` header |
 
-**Verify (insert one row by hand first so there's data):**
+**Design notes (read before pasting — these explain the non-obvious bits):**
+- **`internal/http` uses `package httpapi`.** The directory name follows architecture.md §2, but a package literally named `http` sitting next to `net/http` imports is a readability trap. Go allows the mismatch; `main.go` imports it with an explicit alias.
+- **jsonb → `json.RawMessage`, never `[]byte`.** sqlc returns jsonb columns (`seo`, `blocks`, `settings.data`, `menus.items`) as `[]byte`, and `encoding/json` base64-encodes `[]byte`. Every jsonb field is wrapped in `json.RawMessage` before it goes out, which splices the stored JSON in verbatim. Get this wrong and `/v1/pages/inicio` returns `"blocks":"W3siaWQi..."`.
+- **Empty list ≠ null.** sqlc returns a nil slice when a query matches nothing, and `json.Marshal(nil slice)` emits `null`. The frontend must always get `[]`, so each branch normalizes nil → empty slice.
+- **`/v1/site` always emits all four menu zones**, empty when the row is absent, so the frontend can index `menus.main` without a guard.
+- **UUID/timestamp JSON is free.** `pgtype.UUID`, `pgtype.Timestamptz`, and `pgtype.Text` all implement `MarshalJSON` in pgx v5 — they emit `"uuid-string"` / RFC3339 / `null` correctly, so the sqlc row structs serialize directly. Their `emit_json_tags` snake_case names already match the API convention.
+
+---
+
+#### Step 1 — `apps/api/internal/db/pool.go` (new file)
+
+Hand-written, lives beside the generated files. sqlc only overwrites files it generates, so it will not clobber this.
+
+```go
+package db
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// NewPool opens a pgx connection pool and verifies it is reachable.
+func NewPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
+	cfg, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		return nil, fmt.Errorf("parse DATABASE_URL: %w", err)
+	}
+
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("connect to database: %w", err)
+	}
+
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("ping database: %w", err)
+	}
+
+	return pool, nil
+}
+```
+
+#### Step 2 — `apps/api/internal/http/errors.go` (new file)
+
+The error envelope from architecture.md §2.1. **Everything here is English** — messages, logs, comments. API errors are never rendered raw to users: the frontend switches on the stable `code` and shows its own pt-PT copy. Only text that literally appears on the page or in the CMS admin UI is Portuguese.
+
+```go
+package httpapi
+
+import (
+	"encoding/json"
+	"log"
+	"net/http"
+)
+
+type apiError struct {
+	Code    string            `json:"code"`
+	Message string            `json:"message"`
+	Fields  map[string]string `json:"fields,omitempty"`
+}
+
+type errorEnvelope struct {
+	Error apiError `json:"error"`
+}
+
+func writeJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(status)
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		log.Printf("write json response: %v", err)
+	}
+}
+
+func writeError(w http.ResponseWriter, status int, code, message string) {
+	writeJSON(w, status, errorEnvelope{Error: apiError{Code: code, Message: message}})
+}
+
+// serverError logs the real cause and returns an opaque 500 to the client.
+func serverError(w http.ResponseWriter, what string, err error) {
+	log.Printf("error: %s: %v", what, err)
+	writeError(w, http.StatusInternalServerError, "internal", "internal server error")
+}
+```
+
+#### Step 3 — `apps/api/internal/http/router.go` (new file)
+
+```go
+package httpapi
+
+import (
+	"net/http"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+
+	"github.com/RMLoureiro/airfa-website-2.0/apps/api/internal/db"
+)
+
+// Server holds the dependencies shared by the handlers.
+type Server struct {
+	q *db.Queries
+}
+
+// Router builds the full HTTP surface: /healthz plus the public /v1 reads.
+func Router(q *db.Queries) http.Handler {
+	s := &Server{q: q}
+
+	r := chi.NewRouter()
+	r.Use(middleware.RequestID)
+	r.Use(middleware.Logger)
+	r.Use(middleware.Recoverer)
+
+	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	})
+
+	r.Route("/v1", func(r chi.Router) {
+		r.Get("/site", s.getSite)
+		r.Get("/pages/{slug}", s.getPage)
+		r.Get("/collections/{name}", s.getCollection)
+	})
+
+	r.NotFound(func(w http.ResponseWriter, _ *http.Request) {
+		writeError(w, http.StatusNotFound, "not_found", "resource not found")
+	})
+
+	return r
+}
+```
+
+#### Step 4 — `apps/api/internal/http/site.go` (new file)
+
+```go
+package httpapi
+
+import (
+	"encoding/json"
+	"errors"
+	"net/http"
+
+	"github.com/jackc/pgx/v5"
+)
+
+// menuZones are always present in the response, empty when unset, so the
+// frontend can read menus.main without a nil check.
+var menuZones = []string{"main", "secondary", "utility", "footer"}
+
+// getSite handles GET /v1/site.
+func (s *Server) getSite(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	settings := json.RawMessage(`{}`)
+	data, err := s.q.GetSettings(ctx)
+	switch {
+	case err == nil:
+		settings = json.RawMessage(data)
+	case errors.Is(err, pgx.ErrNoRows):
+		// No settings row seeded yet — an empty object is a valid answer.
+	default:
+		serverError(w, "get settings", err)
+		return
+	}
+
+	rows, err := s.q.ListMenus(ctx)
+	if err != nil {
+		serverError(w, "list menus", err)
+		return
+	}
+
+	menus := make(map[string]json.RawMessage, len(menuZones))
+	for _, zone := range menuZones {
+		menus[zone] = json.RawMessage(`[]`)
+	}
+	for _, m := range rows {
+		menus[m.Zone] = json.RawMessage(m.Items)
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"settings": settings,
+		"menus":    menus,
+	})
+}
+```
+
+#### Step 5 — `apps/api/internal/http/pages.go` (new file)
+
+```go
+package httpapi
+
+import (
+	"encoding/json"
+	"errors"
+	"net/http"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
+)
+
+// getPage handles GET /v1/pages/{slug}. Only published pages are visible;
+// an unpublished or missing slug is a 404 either way.
+func (s *Server) getPage(w http.ResponseWriter, r *http.Request) {
+	slug := chi.URLParam(r, "slug")
+
+	page, err := s.q.GetPublishedPageBySlug(r.Context(), slug)
+	if errors.Is(err, pgx.ErrNoRows) {
+		writeError(w, http.StatusNotFound, "page_not_found", "page not found")
+		return
+	}
+	if err != nil {
+		serverError(w, "get published page", err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"slug":   page.Slug,
+		"title":  page.Title,
+		"seo":    json.RawMessage(page.Seo),
+		"blocks": json.RawMessage(page.Blocks),
+	})
+}
+```
+
+#### Step 6 — `apps/api/internal/http/collections.go` (new file)
+
+```go
+package httpapi
+
+import (
+	"fmt"
+	"net/http"
+	"strconv"
+
+	"github.com/go-chi/chi/v5"
+
+	"github.com/RMLoureiro/airfa-website-2.0/apps/api/internal/db"
+)
+
+const (
+	defaultLimit = 20
+	maxLimit     = 100
+)
+
+// getCollection handles GET /v1/collections/{name}?limit=&offset=.
+func (s *Server) getCollection(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	limit, offset, err := pagination(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_pagination", err.Error())
+		return
+	}
+
+	var (
+		items any
+		total int64
+	)
+
+	switch name := chi.URLParam(r, "name"); name {
+	case "events":
+		rows, err := s.q.ListPublishedEvents(ctx, db.ListPublishedEventsParams{Limit: limit, Offset: offset})
+		if err != nil {
+			serverError(w, "list events", err)
+			return
+		}
+		if rows == nil {
+			rows = []db.ListPublishedEventsRow{}
+		}
+		if total, err = s.q.CountPublishedEvents(ctx); err != nil {
+			serverError(w, "count events", err)
+			return
+		}
+		items = rows
+
+	case "posts":
+		rows, err := s.q.ListPublishedPosts(ctx, db.ListPublishedPostsParams{Limit: limit, Offset: offset})
+		if err != nil {
+			serverError(w, "list posts", err)
+			return
+		}
+		if rows == nil {
+			rows = []db.ListPublishedPostsRow{}
+		}
+		if total, err = s.q.CountPublishedPosts(ctx); err != nil {
+			serverError(w, "count posts", err)
+			return
+		}
+		items = rows
+
+	case "partners":
+		rows, err := s.q.ListPartners(ctx, db.ListPartnersParams{Limit: limit, Offset: offset})
+		if err != nil {
+			serverError(w, "list partners", err)
+			return
+		}
+		// Note: []db.Partner, not []db.ListPartnersRow — ListPartners selects every
+		// column of the table, so sqlc reuses the Partner model instead of
+		// generating a row type. There is no ListPartnersRow.
+		if rows == nil {
+			rows = []db.Partner{}
+		}
+		if total, err = s.q.CountPartners(ctx); err != nil {
+			serverError(w, "count partners", err)
+			return
+		}
+		items = rows
+
+	case "activities":
+		rows, err := s.q.ListPublishedActivities(ctx, db.ListPublishedActivitiesParams{Limit: limit, Offset: offset})
+		if err != nil {
+			serverError(w, "list activities", err)
+			return
+		}
+		if rows == nil {
+			rows = []db.ListPublishedActivitiesRow{}
+		}
+		if total, err = s.q.CountPublishedActivities(ctx); err != nil {
+			serverError(w, "count activities", err)
+			return
+		}
+		items = rows
+
+	default:
+		writeError(w, http.StatusNotFound, "unknown_collection",
+			fmt.Sprintf("unknown collection: %q", name))
+		return
+	}
+
+	w.Header().Set("X-Total-Count", strconv.FormatInt(total, 10))
+	writeJSON(w, http.StatusOK, items)
+}
+
+// pagination reads ?limit=&offset= with defaults and an upper bound.
+func pagination(r *http.Request) (limit, offset int32, err error) {
+	limit, offset = defaultLimit, 0
+
+	if v := r.URL.Query().Get("limit"); v != "" {
+		n, convErr := strconv.Atoi(v)
+		if convErr != nil || n < 1 {
+			return 0, 0, fmt.Errorf("invalid limit parameter: %q", v)
+		}
+		if n > maxLimit {
+			n = maxLimit
+		}
+		limit = int32(n)
+	}
+
+	if v := r.URL.Query().Get("offset"); v != "" {
+		n, convErr := strconv.Atoi(v)
+		if convErr != nil || n < 0 {
+			return 0, 0, fmt.Errorf("invalid offset parameter: %q", v)
+		}
+		offset = int32(n)
+	}
+
+	return limit, offset, nil
+}
+```
+
+> The four branches repeat because each sqlc row type is distinct and Go generics can't tidy this without more machinery than it saves. Leave it explicit.
+
+#### Step 7 — `apps/api/cmd/server/main.go` (replace the whole file)
+
+Adds the pool, the router, and graceful shutdown. Note it now **fails fast if `DATABASE_URL` is unset** — see Step 8.
+
+```go
+package main
+
+import (
+	"context"
+	"errors"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/RMLoureiro/airfa-website-2.0/apps/api/internal/db"
+	httpapi "github.com/RMLoureiro/airfa-website-2.0/apps/api/internal/http"
+)
+
+func main() {
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run() error {
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		return errors.New("DATABASE_URL is not set")
+	}
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	pool, err := db.NewPool(ctx, dsn)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	srv := &http.Server{
+		Addr:              ":" + port,
+		Handler:           httpapi.Router(db.New(pool)),
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+
+	go func() {
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		_ = srv.Shutdown(shutdownCtx)
+	}()
+
+	log.Printf("api listening on %s", srv.Addr)
+	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
+
+	return nil
+}
+```
+
+#### Step 8 — Make `DATABASE_URL` reach `make dev` (edit `Makefile`)
+
+**Why:** the `dev` target runs `go run ./cmd/server` in a subshell. The Makefile defines `DATABASE_URL` but never exports it, so from Step 7 onward **`make dev` would die with "DATABASE_URL is not set"**. One line fixes it — no `.env` loader, no hardcoded credentials in Go.
+
+Add `export DATABASE_URL` directly under the existing assignment at the top of the root `Makefile`:
+
+```makefile
+DATABASE_URL ?= postgres://airfa:airfa@localhost:5432/airfa_dev?sslmode=disable
+export DATABASE_URL
+```
+
+> ⚠️ **The DSN must stay on ONE line.** This broke once (fixed 2026-07-17): the line was split at `airfa_dev?` / `sslmode=disable`. Make does not error — it reads `sslmode=disable` as a *separate variable* and leaves `DATABASE_URL` ending in a bare `?`, which then fails at connect time with a confusing SSL error. Check it with:
+> ```bash
+> make -pn 2>/dev/null | grep -E '^(DATABASE_URL|sslmode)'
+> # must print exactly one line, ending in ?sslmode=disable — and no `sslmode = disable` line
+> ```
+
+#### Step 9 — Resolve dependencies and build
+
+`pgxpool` pulls in two modules (`puddle`, `golang.org/x/sync`) that aren't in `go.mod` yet, because nothing had imported the pool until now.
+
+```bash
+cd apps/api
+go mod tidy
+go build ./...
+go vet ./...
+```
+
+- [x] Step 1 — `internal/db/pool.go` created
+- [x] Steps 2–6 — `internal/http/{errors,router,site,pages,collections}.go` created
+- [x] Step 7 — `cmd/server/main.go` replaced
+- [x] Step 8 — `export DATABASE_URL` added to the Makefile *(the DSN got split across two lines; found + fixed 2026-07-17 — see the warning above)*
+- [x] Step 9 — `go mod tidy` && `go build ./...` && `go vet ./...` all clean — **verified 2026-07-17, both exit 0**
+
+---
+
+#### Step 10 — Seed a little data and verify
+
 ```bash
 psql "postgres://airfa:airfa@localhost:5432/airfa_dev?sslmode=disable" -c \
 "insert into pages(slug,title,status) values('inicio','Início','published');
@@ -526,30 +1026,58 @@ psql "postgres://airfa:airfa@localhost:5432/airfa_dev?sslmode=disable" -c \
  select id,'published','[{\"id\":\"b1\",\"type\":\"rich-text\",\"data\":{\"html\":\"<p>olá</p>\"}}]'::jsonb from pages where slug='inicio';
  insert into menus(zone,items) values('main','[]'),('secondary','[]'),('utility','[]'),('footer','[]');
  insert into settings(data) values('{}');"
+```
 
-make dev   # (or run the api alone)
+Then, in one terminal:
+
+```bash
+make dev     # or: cd apps/api && go run ./cmd/server
+```
+
+And in another:
+
+```bash
+curl -s localhost:8080/healthz | jq
 curl -s localhost:8080/v1/site | jq
 curl -s localhost:8080/v1/pages/inicio | jq
-curl -s "localhost:8080/v1/collections/events?limit=10" -i   # check X-Total-Count header
+curl -s "localhost:8080/v1/collections/events?limit=10" -i     # check the X-Total-Count header
+curl -s localhost:8080/v1/collections/posts | jq               # expect [] — NOT null
+curl -s localhost:8080/v1/collections/partners | jq
+curl -s localhost:8080/v1/collections/activities | jq
+curl -s localhost:8080/v1/collections/nope | jq                # → 404 unknown_collection
+curl -s "localhost:8080/v1/collections/events?limit=abc" | jq  # → 400 invalid_pagination
 curl -s -o /dev/null -w "%{http_code}\n" localhost:8080/v1/pages/does-not-exist   # → 404
 ```
-- [ ] DB pool wired from `DATABASE_URL` in `main.go`
-- [ ] `GET /v1/site` returns settings + menus
-- [ ] `GET /v1/pages/inicio` returns the block tree
-- [ ] `GET /v1/collections/events` returns array + `X-Total-Count`
-- [ ] unknown slug → `404` with error envelope
 
-> `main.go`, the db pool, and the handlers are code (not just config). If you want the full source for any of them rather than the spec, ask and it'll be provided file-by-file.
+**What "correct" looks like** — on `/v1/pages/inicio`, `blocks` must be a real JSON **array** and `seo` a real JSON **object**:
+
+```json
+{
+  "slug": "inicio",
+  "title": "Início",
+  "seo": {},
+  "blocks": [{ "id": "b1", "type": "rich-text", "data": { "html": "<p>olá</p>" } }]
+}
+```
+
+If `blocks` comes back as a base64 string (`"W3siaWQi..."`), a `json.RawMessage` wrap was missed — see the design notes above.
+
+- [x] DB pool wired from `DATABASE_URL` in `main.go`
+- [x] `GET /v1/site` returns settings + all four menu zones
+- [x] `GET /v1/pages/inicio` returns the block tree as real JSON (not base64)
+- [x] `GET /v1/collections/events` returns an array + `X-Total-Count`
+- [x] the other three collections return `[]` (not `null`) when empty
+- [x] unknown slug → `404`; unknown collection → `404`; bad `limit` → `400` — all with the error envelope
 
 ---
 
 ## ✅ Definition of done for this phase
 
-- [ ] `make dev` starts API + web together
-- [ ] All 11 tables migrate up **and** down cleanly
-- [ ] `sqlc` generates; `go build ./apps/api/...` compiles
-- [ ] `/v1/site`, `/v1/pages/:slug`, `/v1/collections/*` all return valid JSON
-- [ ] (optional) local checkpoint commit — plain message, no co-author line
+- [x] `make dev` starts API + web together
+- [x] All 11 tables migrate up **and** down cleanly
+- [x] `sqlc` generates; `go build ./apps/api/...` compiles
+- [x] `/v1/site`, `/v1/pages/:slug`, `/v1/collections/*` all return valid JSON
+- [x] (optional) local checkpoint commit — plain message, no co-author line
 
 **Next phase after this:** Phase 1 · Stage B — design tokens (Inter via `next/font`) + Tailwind colors sampled from the mockups.
 

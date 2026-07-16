@@ -39,6 +39,8 @@ Not yet done (intentionally folded into Stage A): first migration (users/session
 
 ## Decisions
 
+- **2026-07-17 — All non-user-visible strings are English, including API error messages.** Owner's call, reversing the "pt for CMS-facing messages" wording in architecture.md §2.1 (§2.1 updated). Rule: **only text that literally renders on the public page or in the CMS admin UI is Portuguese.** Logs, Go errors, and the API error envelope's `message`/`fields` are English — they're developer-facing. The frontend never shows an API `message` raw; it switches on the stable `code` and renders its own pt-PT copy, which is also where any translation happens. **Corollary: `code` is the API contract** — keep codes stable and machine-readable, and never have the frontend match on `message` text. Applied across `apps/api/internal/http/*` (5 strings).
+
 - **2026-07-12 — Fresh start; disregard previous 2.0 iteration.** Owner explicitly instructed that all prior decisions/artifacts from the earlier attempt are void. `../airfa-website/` (current live site code) remains the content reference.
 - **2026-07-12 — Stack: Go API + Next.js frontend.** Owner wants Go on the backend; Next.js chosen over a plain React SPA for SSR/SEO/link previews on a public association site. Frontend is React + TypeScript per owner preference.
 - **2026-07-12 — Portuguese-only content** for launch; schema should not block adding locales later (assumed by agent, silently confirmable).
